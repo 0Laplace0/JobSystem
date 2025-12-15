@@ -10,8 +10,8 @@ const formatTime = (d) =>
 
 /* ================= Config ================= */
 const STORAGE_KEY = "attendance_records_v1";
-const WORK_START = { h: 9, m: 0 };     // 09:00
-const LATE_AFTER_MINUTES = 1;          // เกิน 09:01 = สาย
+const WORK_START = { h: 9, m: 0 }; // 09:00
+const LATE_AFTER_MINUTES = 1; // เกิน 09:01 = สาย
 
 /* ================= Component ================= */
 export default function AttendancePage() {
@@ -30,8 +30,11 @@ export default function AttendancePage() {
   /* ---------- leave form ---------- */
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveDate, setLeaveDate] = useState(formatDate(new Date()));
-  const [leaveType, setLeaveType] = useState("");   // ⭐ สำคัญ (แก้หน้าขาว)
+  const [leaveType, setLeaveType] = useState("");
   const [leaveNote, setLeaveNote] = useState("");
+
+  /* ✅ date filter (แทนปุ่มล้างข้อมูล) */
+  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
 
   /* ---------- realtime clock ---------- */
   useEffect(() => {
@@ -71,6 +74,14 @@ export default function AttendancePage() {
 
     return now > lateCutoff;
   }, [now]);
+
+  /* ✅ records ของวันที่ที่เลือก (สำหรับตาราง) */
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const recordDate = r.type === "LEAVE" && r.leaveDate ? r.leaveDate : r.date;
+      return recordDate === selectedDate;
+    });
+  }, [records, selectedDate]);
 
   /* ================= Actions ================= */
   const addRecord = (type, extra = {}) => {
@@ -118,11 +129,9 @@ export default function AttendancePage() {
     setLeaveNote("");
     setLeaveType("");
     setShowLeaveForm(false);
-  };
 
-  const onClearAll = () => {
-    if (!window.confirm("ล้างข้อมูลทั้งหมด?")) return;
-    setRecords([]);
+    // ✅ ถ้ากำลังดูวันที่เดียวกับที่ลาอยู่ จะเห็นรายการทันที
+    setSelectedDate(leaveDate);
   };
 
   /* ================= Render helpers ================= */
@@ -158,17 +167,24 @@ export default function AttendancePage() {
 
         <div className="att-actions">
           <button className="btn btn-green" onClick={onCheckIn}>
-            เข้างาน
+            Check In
           </button>
           <button className="btn btn-red" onClick={onCheckOut}>
-            ออกงาน
+            Check Out
           </button>
           <button className="btn btn-yellow" onClick={() => setShowLeaveForm(true)}>
-            ลา
+            Leave
           </button>
-          <button className="btn btn-ghost" onClick={onClearAll}>
-            ล้างข้อมูล
-          </button>
+
+          <div className="att-datefilter">
+            <span className="att-datefilter-label">Date :</span>
+            <input
+              className="att-datefilter-input"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -242,10 +258,7 @@ export default function AttendancePage() {
             <button className="btn" onClick={onSubmitLeave}>
               บันทึกการลา
             </button>
-            <button
-              className="btn btn-ghost"
-              onClick={() => setShowLeaveForm(false)}
-            >
+            <button className="btn btn-ghost" onClick={() => setShowLeaveForm(false)}>
               ยกเลิก
             </button>
           </div>
@@ -254,7 +267,9 @@ export default function AttendancePage() {
 
       {/* Table */}
       <div className="table-wrap">
-        <div className="table-title">ประวัติสถานะ</div>
+        <div className="table-title">
+          ประวัติสถานะ (วันที่ {selectedDate})
+        </div>
 
         <table className="att-table">
           <thead>
@@ -265,25 +280,24 @@ export default function AttendancePage() {
               <th>Note</th>
             </tr>
           </thead>
+
           <tbody>
-            {records.length === 0 ? (
+            {filteredRecords.length === 0 ? (
               <tr>
                 <td colSpan={4} className="empty">
-                  ยังไม่มีข้อมูล
+                  ไม่มีข้อมูลในวันที่ {selectedDate}
                 </td>
               </tr>
             ) : (
-              records.map((r) => (
+              filteredRecords.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.type === "LEAVE" ? r.leaveDate : r.date}</td>
+                  <td>{r.type === "LEAVE" && r.leaveDate ? r.leaveDate : r.date}</td>
                   <td>{r.time}</td>
                   <td>
-                    <span className={typeClass(r.type)}>
-                      {typeLabel(r.type)}
-                    </span>
+                    <span className={typeClass(r.type)}>{typeLabel(r.type)}</span>
                   </td>
                   <td className="note-cell">
-                    {r.leaveType && `(${r.leaveType}) `}
+                    {r.leaveType ? `(${r.leaveType}) ` : ""}
                     {r.note || "-"}
                   </td>
                 </tr>
